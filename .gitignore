@@ -118,5 +118,4 @@ RespostaEX3.5/*
 Antigo/*
 *Icon*
 
-# Pasta criada pelo aluno na demo 01.2 (import) - efemera
-01-Terraform/demos/02-Modules/import-demo/
+# A pasta import-demo (demo 01.2) e versionada, mas seus artefatos locais nao

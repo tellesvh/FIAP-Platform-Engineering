@@ -421,44 +421,44 @@ echo "Security Group criado na mão: $SG_ID (na VPC $VPC_ID)"
 
 <a id="passo-12"></a>
 
-**12.** Crie uma pasta para este exercício e declare um **`import` block** apontando para o SG. Use o `SG_ID` que apareceu no passo anterior:
+**12.** Entre na pasta `import-demo`, que **já existe no repositório** com o arquivo `import.tf` pronto. Você **não precisa criar nem editar nada aqui** — só entrar e abrir o arquivo para ver o que ele faz:
 
 ```bash
-mkdir -p /workspaces/FIAP-Platform-Engineering/01-Terraform/demos/02-Modules/import-demo
 cd /workspaces/FIAP-Platform-Engineering/01-Terraform/demos/02-Modules/import-demo
 code import.tf
 ```
 
-Conteúdo do `import.tf` (troque `sg-xxxx` pelo seu `SG_ID` e `vpc-xxxx` pela sua VPC):
+O arquivo `import.tf` já está assim (não altere — apenas leia):
 
 ```hcl
-terraform {
-  required_version = ">= 1.10"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
+# ID do Security Group criado "na mao" no passo 11. Voce passa este valor na linha
+# de comando (-var "sg_id=$SG_ID"), entao NAO precisa editar este arquivo.
+variable "sg_id" {
+  type = string
 }
 
-provider "aws" {
-  region = "us-east-1"
+# A VPC da Vortex e descoberta por tag (igual as outras demos), entao nao e
+# preciso colar o id da VPC em lugar nenhum.
+data "aws_vpc" "vpc" {
+  tags = { Name = "fiap-lab" }
 }
 
 # O import block diz: "este recurso ja existe na AWS com este id; passe a
 # gerencia-lo com este endereco no Terraform". Declarativo e versionavel.
 import {
   to = aws_security_group.legado
-  id = "sg-xxxx"
+  id = var.sg_id
 }
 
 resource "aws_security_group" "legado" {
   name        = "vortex-legado-sg"
   description = "SG criado na mao para demo de import"
-  vpc_id      = "vpc-xxxx"
+  vpc_id      = data.aws_vpc.vpc.id
 }
 ```
+
+> [!NOTE]
+> Repare: não há `sg-xxxx` nem `vpc-xxxx` para você substituir. O **ID do Security Group** entra pela variável `sg_id` (você passa na linha de comando, com a variável `$SG_ID` que já está no seu terminal desde o passo 11), e a **VPC** é descoberta automaticamente pela tag `fiap-lab`. Assim você não corre o risco de colar o ID errado no arquivo.
 
 <details>
 <summary><b>💡 Clique para entender: import block vs. terraform import (CLI)</b></summary>
@@ -480,15 +480,15 @@ Documentação oficial: [Import block](https://developer.hashicorp.com/terraform
 
 <a id="passo-13"></a>
 
-**13.** Inicialize e rode o `plan`. O Terraform mostra `1 to import` — ele vai **adotar** o recurso, não criar um novo:
+**13.** Inicialize e rode o `plan`, passando o ID do Security Group pela variável `sg_id` (a variável `$SG_ID` já está no seu terminal desde o passo 11). O Terraform mostra `1 to import` — ele vai **adotar** o recurso, não criar um novo:
 
 ```bash
 terraform init
-terraform plan
+terraform plan -var "sg_id=$SG_ID"
 ```
 
 > [!TIP]
-> Se você não quisesse escrever o `resource` à mão, poderia rodar `terraform plan -generate-config-out=gerado.tf` e o Terraform **geraria** o bloco do recurso a partir do que existe na AWS. Ótimo para recursos grandes (um SG com dezenas de regras).
+> O `-var "sg_id=$SG_ID"` injeta o ID na variável do arquivo, sem você editar nada. Se preferir nem escrever o `resource` à mão, o Terraform também consegue **gerá-lo** a partir do que existe na AWS com `terraform plan -generate-config-out=gerado.tf` — ótimo para recursos grandes (um SG com dezenas de regras).
 
 ---
 
@@ -497,7 +497,7 @@ terraform plan
 **14.** Aplique a adoção e confirme que o recurso entrou no estado:
 
 ```bash
-terraform apply -auto-approve
+terraform apply -auto-approve -var "sg_id=$SG_ID"
 terraform state list
 ```
 
@@ -525,45 +525,54 @@ Você vai renomear o recurso importado usando um **`moved` block**, provando que
 
 <a id="passo-15"></a>
 
-**15.** No mesmo `import.tf`, **remova o `import` block** (a adoção já aconteceu) e adicione um **`moved` block** renomeando `legado` para `vortex`. O arquivo fica assim (mantenha seu `vpc-xxxx`):
+**15.** Agora vamos **renomear** o recurso de `legado` para `vortex` sem destruí-lo. A adoção (import) já aconteceu, então faça **três pequenas mudanças** no `import.tf`. Abra o arquivo:
+
+```bash
+code import.tf
+```
+
+Faça exatamente estas três alterações (o resto do arquivo continua igual — não mexa na `variable`, no `data` nem no `provider`):
+
+**15.1.** **Apague** o bloco `import { ... }` inteiro (a adoção já foi feita, ele não é mais necessário):
 
 ```hcl
-terraform {
-  required_version = ">= 1.10"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 6.0"
-    }
-  }
+# APAGUE estas 4 linhas:
+import {
+  to = aws_security_group.legado
+  id = var.sg_id
 }
+```
 
-provider "aws" {
-  region = "us-east-1"
-}
+**15.2.** **No lugar dele**, adicione o bloco `moved`:
 
+```hcl
 # moved diz: "o recurso que se chamava .legado agora se chama .vortex".
 # O Terraform so atualiza o endereco no estado — nao destroi nada.
 moved {
   from = aws_security_group.legado
   to   = aws_security_group.vortex
 }
-
-resource "aws_security_group" "vortex" {
-  name        = "vortex-legado-sg"
-  description = "SG criado na mao para demo de import"
-  vpc_id      = "vpc-xxxx"
-}
 ```
+
+**15.3.** Na última linha do `resource`, troque o nome `legado` por `vortex` (só o nome depois de `aws_security_group`):
+
+```hcl
+resource "aws_security_group" "vortex" {
+```
+
+**15.4.** Salve o arquivo (**File → Save**, ou `Ctrl+S` / `Cmd+S`).
+
+> [!NOTE]
+> Você **não** precisa mexer no `vpc_id` — ele continua descobrindo a VPC pela tag automaticamente. A única coisa que muda é o **nome** do recurso (`legado` → `vortex`) e a troca do `import` pelo `moved`.
 
 ---
 
 <a id="passo-16"></a>
 
-**16.** Rode o `plan`. A mensagem-chave é `has moved to`, e o resumo é `0 to add, 0 to change, 0 to destroy`:
+**16.** Rode o `plan` (continue passando o `-var`). A mensagem-chave é `has moved to`, e o resumo é `0 to add, 0 to change, 0 to destroy`:
 
 ```bash
-terraform plan
+terraform plan -var "sg_id=$SG_ID"
 ```
 
 <details>
@@ -583,19 +592,29 @@ Documentação oficial: [moved block](https://developer.hashicorp.com/terraform/
 
 <a id="passo-17"></a>
 
-**17.** Aplique o rename e **limpe** o recurso da demo (ele foi só para o exercício de import/moved; a rede da Vortex continua de pé):
+**17.** Aplique o rename e depois limpe o recurso da demo. Em duas etapas separadas, para ler cada saída com calma:
+
+**17.1.** Aplique o `moved`:
 
 ```bash
-terraform apply -auto-approve
-terraform destroy -auto-approve
+terraform apply -auto-approve -var "sg_id=$SG_ID"
+```
+
+> [!NOTE]
+> Observe na saída a mensagem `aws_security_group.legado has moved to aws_security_group.vortex` e o resumo `0 added, 0 changed, 0 destroyed` — o recurso **não foi recriado**, só mudou de nome no estado.
+
+**17.2.** Destrua o Security Group da demo (ele foi só para o exercício de import/moved; a VPC e as route tables da Vortex continuam de pé):
+
+```bash
+terraform destroy -auto-approve -var "sg_id=$SG_ID"
 ```
 
 ### Checkpoint
 
 Se chegou até aqui, você:
 
-- renomeou um recurso com `moved`, sem destruí-lo
-- viu o `plan` confirmar `0 to destroy`
+- adotou um recurso existente com `import` (sem recriá-lo)
+- renomeou esse recurso com `moved`, sem destruí-lo (`0 to destroy`)
 - destruiu o SG da demo (a VPC/route tables da Vortex permanecem)
 
 ---
