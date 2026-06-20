@@ -379,10 +379,12 @@ Provavelmente o terminal A já tinha terminado (você respondeu o prompt ou ele 
 
 <a id="passo-14"></a>
 
-**14.** Volte ao terminal **A** e responda o prompt com `yes` (ou `no` para cancelar). Em qualquer caso, o lock é **liberado** e o `.tflock` desaparece do bucket. Confirme:
+**14.** Volte ao terminal **A** e responda o prompt com `yes` (ou `no` para cancelar). Em qualquer caso, o lock é **liberado** e o `.tflock` desaparece do bucket. Confirme — o comando abaixo **descobre sozinho** o nome do seu bucket (o que começa com `base-config`) e lista o conteúdo da pasta de estado:
 
 ```bash
-aws s3 ls s3://base-config-SEU-RM/demo-state/
+BUCKET=$(aws s3 ls | awk '{print $3}' | grep '^base-config' | head -1)
+echo "Bucket: $BUCKET"
+aws s3 ls "s3://$BUCKET/demo-state/"
 ```
 
 Agora só aparece `terraform.tfstate` — o `.tflock` sumiu.
