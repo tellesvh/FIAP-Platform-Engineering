@@ -452,27 +452,20 @@ No [painel do Load Balancer](https://us-east-1.console.aws.amazon.com/ec2/home?r
 
 <a id="passo-13"></a>
 
-**13.** Destrua **toda** a infra deste lab — a frota e também a rede criada no Lab 01.2. Primeiro a frota (estamos na pasta `03-Count`):
+**13.** Destrua **apenas a frota** deste lab (as EC2 + ALB). Estamos na pasta `03-Count`:
 
 ```bash
 terraform destroy -auto-approve
 ```
 
-Depois destrua as route tables e a VPC, na ordem inversa em que foram criadas:
-
-```bash
-cd /workspaces/FIAP-Platform-Engineering/01-Terraform/demos/02-Modules/RT-call && terraform destroy -auto-approve
-```
-
-```bash
-cd /workspaces/FIAP-Platform-Engineering/01-Terraform/demos/02-Modules/vpc-call && terraform destroy -auto-approve
-```
+> [!IMPORTANT]
+> **Não destrua a rede (VPC e route tables) agora.** Os próximos labs — **01.4 (State)** e **01.5 (Workspaces)** — também usam a VPC `fiap-lab` criada no Lab 01.2. Se você apagar a rede aqui, eles não vão encontrar a VPC e falharão logo no início. A rede só será destruída **no final do Lab 01.5**, que é o último a usá-la.
 
 <details>
-<summary><b>⚠ Se der erro: <code>DependencyViolation</code> ao destruir a VPC</b></summary>
+<summary><b>⚠ Se der erro: <code>DependencyViolation</code> (ao destruir algo preso na VPC)</b></summary>
 <blockquote>
 
-Causa: ainda há recurso preso na VPC (uma EC2 ou o ALB não terminou de morrer). Confirme que o `destroy` da pasta `03-Count` terminou de fato (sem instâncias `running` no painel EC2 e sem o load balancer `vortex-frota-alb` no painel) e que o `destroy` do `RT-call` rodou antes do `vpc-call` (passo 13). Depois rode o `destroy` da VPC de novo.
+Esse erro aparece quando se tenta destruir a rede com um recurso ainda preso nela. Como **aqui você destrói só a frota** (a VPC permanece), o erro não deve ocorrer neste passo. Se aparecer no futuro (ao destruir a rede no Lab 01.5), confirme que o `destroy` da frota (`03-Count`) terminou de fato — sem instâncias `running` no painel EC2 e sem o load balancer `vortex-frota-alb` no painel — antes de destruir a VPC.
 
 </blockquote>
 </details>
@@ -482,8 +475,8 @@ Causa: ainda há recurso preso na VPC (uma EC2 ou o ALB não terminou de morrer)
 Se chegou até aqui:
 
 - você escalou a frota 2 → 3 → 1 só mudando o `count`
-- destruiu a frota, as route tables e a VPC
-- não há mais nada cobrando na conta
+- destruiu **a frota** (EC2 + ALB), confirmando que nada da frota ficou cobrando
+- **manteve a rede de pé** (VPC + route tables) para os próximos labs
 
 ---
 
@@ -500,7 +493,7 @@ Abra o próximo lab: **[Lab 01.4 — State remoto](../04-State/README.md)**.
 Lá vamos mover o estado do Terraform para um bucket S3 compartilhado, para que o time inteiro da Vortex colabore na mesma infraestrutura sem corromper o estado.
 
 > [!CAUTION]
-> **Custo:** este lab roda até 3 EC2 `t3.micro` (~$0,01/h cada) + 1 Application Load Balancer (~$0,0225/h + LCU; para a escala do lab, mesma ordem de grandeza). Confirme no painel EC2 que **nenhuma** instância ficou `running` e que o load balancer `vortex-frota-alb` sumiu após o passo 13. Esquecer ligado por um dia consome alguns dólares do orçamento do Learner Lab.
+> **Custo:** este lab roda até 3 EC2 `t3.micro` (~$0,01/h cada) + 1 Application Load Balancer (~$0,0225/h + LCU; para a escala do lab, mesma ordem de grandeza). Confirme no painel EC2 que **nenhuma** instância ficou `running` e que o load balancer `vortex-frota-alb` sumiu após o passo 13. A **VPC continua de pé** de propósito (sem custo relevante — VPC, subnets e route tables são gratuitas) e será destruída no Lab 01.5. Esquecer uma EC2/ALB ligados por um dia consome alguns dólares do orçamento do Learner Lab.
 
 ---
 
