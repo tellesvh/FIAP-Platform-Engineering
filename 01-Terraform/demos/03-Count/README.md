@@ -15,7 +15,7 @@ Os comandos `bash` rodam **no terminal do Codespaces**. As verificações são f
 > - [ ] [Lab 01.2 — Módulos](../02-Modules/README.md) concluído **por completo** — tanto o `vpc-call` (VPC + subnets) **quanto o `RT-call` (route tables com rota para o Internet Gateway)**. Sem as rotas, os servidores sobem mas ficam sem internet, não conseguem registrar no SSM e o provisionamento falha.
 > - [ ] Credenciais AWS do Academy atualizadas no Codespaces
 > - [ ] AWS CLI e `jq` disponíveis (o devcontainer já entrega; o passo 3 valida de novo)
-> - [ ] Você consegue abrir o [painel EC2 → Load Balancers](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancers:)
+> - [ ] Você consegue abrir o [painel EC2 → Load Balancers](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancers:) e o [painel EC2 → Target Groups](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#TargetGroups:) (é nos **Target Groups** que você vê as máquinas entrando e saindo)
 >
 > **Valide rapidamente que a rede do lab anterior existe e tem rota para a internet:**
 >
@@ -311,7 +311,7 @@ Documentação oficial: [aws_lb](https://registry.terraform.io/providers/hashico
 
 <a id="passo-5"></a>
 
-**5.** Aguarde alguns minutos para as máquinas ficarem prontas e o `apply` terminar. No [painel do Load Balancer](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancers:), abra a aba **Target groups** → o target group `vortex-frota-tg` → **Targets**: você verá inicialmente as máquinas em estado **unhealthy** enquanto o ALB faz as verificações de integridade.
+**5.** Aguarde alguns minutos para as máquinas ficarem prontas e o `apply` terminar. Abra o [painel EC2 → Target Groups](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#TargetGroups:), **clique no target group `vortex-frota-tg`** e vá até a aba **Targets** (na parte de baixo da tela). É aqui — no target group, não no Load Balancer — que você acompanha as máquinas: você verá inicialmente as duas em estado **unhealthy** enquanto o ALB faz as verificações de integridade.
 
 Logo ao final do `apply` o Terraform também roda um **check block** (arquivo `check.tf`) que tenta acessar `http://<dns-do-alb>/` e verificar se respondeu `200`. Como o ALB normalmente ainda está em *warm-up* nesse instante, é **esperado** ver um aviso como:
 
@@ -348,7 +348,7 @@ Documentação oficial: [Health checks de target group](https://docs.aws.amazon.
 
 <a id="passo-6"></a>
 
-**6.** Aguarde até que todas as máquinas estejam **healthy** no target group `vortex-frota-tg`.
+**6.** Na mesma tela ([Target Groups](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#TargetGroups:) → `vortex-frota-tg` → aba **Targets**), atualize (botão de refresh) até que **todas** as máquinas apareçam como **healthy**.
 
 ![inservice](images/inservice2.png)
 
@@ -416,7 +416,7 @@ terraform apply -auto-approve
 
 ![apply2](images/apply2.png)
 
-No [painel do Load Balancer](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancers:), a terceira máquina foi criada e registrada.
+Abra o [painel EC2 → Target Groups](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#TargetGroups:), clique em `vortex-frota-tg` → aba **Targets**: a terceira máquina apareceu na lista (primeiro `unhealthy`, depois `healthy`) — você está **vendo a frota crescer ao vivo**.
 
 ![inservice3](images/inservice3.png)
 
@@ -444,7 +444,7 @@ terraform apply -auto-approve
 
 ![countmod2](images/countmod2.png)
 
-No [painel do Load Balancer](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#LoadBalancers:) restará uma única máquina.
+No [painel EC2 → Target Groups](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#TargetGroups:) (`vortex-frota-tg` → aba **Targets**), as duas máquinas removidas saem da lista (passando por `draining`) e resta **uma única** — você está **vendo a frota encolher ao vivo**.
 
 ![service1](images/inservice1.png)
 
