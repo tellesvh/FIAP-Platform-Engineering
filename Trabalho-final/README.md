@@ -47,6 +47,8 @@ Ao final, você terá um **repositório GitLab** que:
 - roda um **pipeline de 3 etapas** (validar → revisar/gate de segurança → aplicar) no seu GitLab Runner;
 - vem acompanhado de um **`DECISION.md`** (ADR) que justifica as escolhas técnicas para Helena.
 
+A **entrega** (Parte 5) é um `.zip` com esse código Terraform, o `DECISION.md` e alguns **prints que provam que o pipeline rodou** (o código já é a prova do resto).
+
 > [!TIP]
 > Sempre que encontrar um bloco com o título **💡 Clique para entender**, abra-o. Ele traz a anatomia do requisito, o porquê da escolha e links oficiais. Não é obrigatório para concluir, mas aprofunda.
 
@@ -434,12 +436,21 @@ O job está esperando um Runner. Verifique em **Settings → CI/CD → Runners**
 </blockquote>
 </details>
 
+Quando o pipeline terminar, é aqui que você tira **os prints que vão na entrega** (Parte 5) — eles são a prova de que o CI/CD rodou de verdade:
+
+> 📸 **Print obrigatório** — salve como `prints/01-pipeline-verde.png`. Capture a página do pipeline no GitLab com os **3 stages verdes** (`validar → revisar → aplicar`), rodando no seu runner.
+
+> 📸 **Print obrigatório** — salve como `prints/02-tests-checkov.png`. Abra a aba **Tests** do pipeline e capture o relatório do **Checkov** (o gate do stage `revisar`).
+
+> 📸 **Print obrigatório** — salve como `prints/03-api-no-ar.png`. No terminal do Codespaces, rode `terraform workspace select prod && terraform output -raw alb_dns` para pegar o DNS, faça `curl http://<DNS>/` e capture a resposta do nginx (ou abra no navegador).
+
 ### Checkpoint
 
 - [ ] O repositório no GitLab tem só o código deste trabalho (sem state, sem credenciais).
 - [ ] O pipeline tem 3 etapas (`validar → revisar → aplicar`) e elas rodam no seu Runner próprio.
 - [ ] O pipeline selecionou o workspace e as EC2s desse ambiente estão acessíveis pelo DNS do **ALB**.
 - [ ] O relatório do **Checkov** (JUnit) aparece na aba **Tests** e o `plan.tfplan` está como artefato.
+- [ ] Você tirou os 3 prints (`01-pipeline-verde`, `02-tests-checkov`, `03-api-no-ar`) para a entrega.
 
 ---
 
@@ -469,31 +480,69 @@ Um `DECISION.md` que justifica, em linguagem de negócio, as escolhas técnicas 
 
 ### Resultado esperado desta parte
 
-Um pacote `.zip` submetido no portal da FIAP, mais o link do repositório GitLab.
+Um `.zip` com **todo o Terraform que você desenvolveu** (do jeito que você organizou) + o `DECISION.md` + os **prints que provam que o pipeline rodou**, mais o link do repositório GitLab.
 
 ---
 
 <a id="req-10"></a>
 
-**Requisito 10.** Faça um **zip** dos arquivos deste exercício (código Terraform + `.gitlab-ci.yml` + `DECISION.md`, **sem** o diretório `.terraform/` nem o `terraform.tfstate`) e submeta no **portal da FIAP**.
+**Requisito 10.** A entrega é **código + prints**. O **código** que você escreveu já é a prova do que você fez (módulo, workspaces, backend) — por isso **não pedimos print do código**. O que o código *não* mostra é que o **pipeline rodou de verdade na nuvem** — e é isso que os prints provam.
+
+#### O que entra no zip
+
+Todo o código do trabalho, **na estrutura em que você o desenvolveu** — algo como:
+
+```text
+trabalho-final/
+├── main.tf                 # raiz: provider + chamada do modulo + output
+├── backend.tf              # state remoto no S3
+├── versions.tf
+├── .gitlab-ci.yml          # pipeline de 3 stages
+├── DECISION.md             # seu ADR preenchido
+├── modules/
+│   └── web-cluster/        # o modulo que voce criou a partir da demo Count
+│       ├── main.tf · variables.tf · data.tf · outputs.tf · script.sh
+└── prints/                 # as evidencias de que o pipeline rodou (abaixo)
+    ├── 01-pipeline-verde.png
+    ├── 02-tests-checkov.png
+    └── 03-api-no-ar.png
+```
+
+#### Prints obrigatórios (foco em CI/CD — provar que rodou)
+
+Você **não desenvolve nada de CI/CD além do `.gitlab-ci.yml`**, mas precisa **provar que o pipeline executou** no seu runner e entregou a infra. Tire estes três (salve em `prints/`):
+
+- **`01-pipeline-verde.png`** — a página do pipeline no GitLab com os **3 stages verdes** (`validar → revisar → aplicar`), rodando no **seu** runner.
+- **`02-tests-checkov.png`** — a **aba Tests** do pipeline mostrando o relatório do **Checkov** (o gate de segurança do stage `revisar`).
+- **`03-api-no-ar.png`** — o terminal com o `curl http://<DNS-do-ALB>/` respondendo (ou a página no navegador) — a infra que o `apply` subiu, **no ar**.
+
+#### Montando o zip (duas partes)
+
+Suas coisas ficam em **dois lugares**: o **código** está no Codespaces (nuvem); os **prints** são `.png` na **sua máquina** (você os salvou com print de tela). Por isso:
+
+**Parte A — no Codespaces:** empacote só o código, sem os artefatos pesados/locais (`.terraform/`, state, `build/`, `plan.tfplan`):
 
 ```bash
 cd /workspaces/FIAP-Platform-Engineering/Trabalho-final
-zip -r trabalho-final-<SEU-RM>.zip . -x '*.terraform/*' -x '*.tfstate*' -x '*.git/*'
+zip -r trabalho-final-<SEU-RM>.zip . \
+  -x '*/.terraform/*' -x '*.tfstate*' -x '*.terraform.lock.hcl' \
+  -x '*/build/*' -x 'plan.tfplan' -x '*/.git/*'
 ```
 
-**Itens da submissão:**
+No painel de arquivos do Codespaces, clique com o botão direito em `trabalho-final-<SEU-RM>.zip` → **Download**.
 
-- [ ] `trabalho-final-<SEU-RM>.zip` (código + `.gitlab-ci.yml` + `DECISION.md`)
-- [ ] **Link do repositório GitLab** (cole no campo de texto da entrega no portal)
-- [ ] **Print do pipeline verde** com as 3 etapas concluídas
-- [ ] **Print do relatório/artefato** de validação anexado ao pipeline
+**Parte B — na sua máquina:** descompacte o zip baixado, crie uma pasta `prints/` dentro dele, mova para lá os **3 prints** e recompacte. O `trabalho-final-<SEU-RM>.zip` final (código + `DECISION.md` + `prints/`) é o que você entrega.
 
-> [!IMPORTANT]
-> **Prazo e forma de entrega**: `<prazo definido pelo professor>`. Confira o portal da FIAP / comunicado da turma para a data exata e o canal de submissão.
+#### Submissão
+
+- [ ] `trabalho-final-<SEU-RM>.zip` (código + `.gitlab-ci.yml` + `DECISION.md` + `prints/`)
+- [ ] **Link do repositório GitLab** (cole no campo de texto da entrega)
+- [ ] Os **3 prints** dentro de `prints/`
+
+Envie no canal indicado pelo professor (portal da FIAP / comunicado da turma).
 
 > [!CAUTION]
-> **Destrua a infraestrutura ao terminar** — este é o fim do arco, então derrube **tudo**: a infra do trabalho (EC2 + ALB em `dev` e `prod`) **e** o runner da Parte 0. Deixar ligado consome o orçamento do Learner Lab.
+> **Destrua a infraestrutura ao terminar** — este é o fim do arco, então derrube **tudo**: a infra do trabalho (EC2 + ALB em `dev` e `prod`) **e** o runner da Parte 0. Deixar ligado consome o orçamento do Learner Lab. Como a entrega é código + prints, **nada se perde** ao destruir.
 >
 > ```bash
 > # 1) infra do trabalho, nos dois ambientes
@@ -508,8 +557,9 @@ zip -r trabalho-final-<SEU-RM>.zip . -x '*.terraform/*' -x '*.tfstate*' -x '*.gi
 
 ### Checkpoint
 
-- [ ] O `.zip` foi gerado sem `.terraform/` nem `.tfstate`.
-- [ ] A submissão no portal inclui o link do GitLab e os prints.
+- [ ] O `.zip` tem o código Terraform completo (módulo + raiz + `.gitlab-ci.yml` + `DECISION.md`), sem `.terraform/` nem `.tfstate`.
+- [ ] A pasta `prints/` tem os 3 prints (pipeline verde, aba Tests/Checkov, API no ar).
+- [ ] A submissão inclui o link do GitLab.
 - [ ] A infraestrutura do trabalho foi destruída nos dois ambientes **e** o runner da Parte 0 também.
 
 ---
