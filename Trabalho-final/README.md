@@ -204,6 +204,7 @@ A lógica da demo Count vira um **módulo reutilizável** que recebe a quantidad
 
 - Crie uma pasta de módulo (ex: `modules/web-cluster/`) com os recursos da demo Count (`aws_instance`, `aws_lb`, `aws_lb_target_group`, `aws_lb_listener`, `aws_security_group`, data sources de VPC/subnet).
 - Declare uma variável de entrada, por exemplo `variable "node_count"`, e use-a no `count` das instâncias.
+- **Exponha o DNS do ALB como `output` do módulo** (a partir de `aws_lb.<seu_alb>.dns_name`). É esse output que o arquivo raiz vai consumir no Requisito 2 — **anote o nome que você deu a ele** (a demo Count usa outros nomes de output; aqui você decide o seu).
 - O módulo **não** deve conter um bloco `backend` nem o `provider "aws"` duplicado — isso fica no arquivo raiz que o chama.
 
 <details>
@@ -225,20 +226,13 @@ Documentação oficial:
 
 <a id="req-2"></a>
 
-**Requisito 2.** Crie o **arquivo raiz** que chama o módulo recém-criado, passando o `node_count` e expondo o DNS do load balancer (ALB) como `output`. O `node_count` **deriva do workspace** (é o que diferencia `dev` de `prod` — Requisito 6): assim o pipeline não precisa receber nenhuma variável extra, basta selecionar o workspace.
+**Requisito 2.** Crie o **arquivo raiz** que chama o módulo (`source` apontando para a pasta do módulo), passa o `node_count` e expõe o DNS do ALB como `output` do raiz. Pontos que o raiz resolve:
 
-```hcl
-# main.tf (raiz)
-module "web_cluster" {
-  source = "./modules/web-cluster"
-  # dev = 1 no; prod = 3 nos. O valor vem do workspace ativo, sem -var nem tfvars.
-  node_count = terraform.workspace == "prod" ? 3 : 1
-}
+- **Consuma o output do seu módulo pelo nome exato** que você definiu no Requisito 1 (`module.<nome_do_modulo>.<seu_output>`). Se os nomes não baterem, o `terraform validate` acusa `Error: Unsupported attribute ... does not have an attribute named ...`.
+- **`node_count` deriva do workspace** (`dev` = 1, `prod` = 3): use uma expressão condicional sobre `terraform.workspace` no argumento `node_count`. Assim o pipeline não precisa de `-var`/`tfvars` — basta selecionar o workspace.
+- **`provider "aws"` e o `backend`** ficam **no raiz**, nunca no módulo.
 
-output "alb_dns" {
-  value = module.web_cluster.alb_dns_name
-}
-```
+> 📚 Como chamar um módulo, passar variável e expor `output` está na demo [01.2 - Modules](../01-Terraform/demos/02-Modules/README.md); a concatenação com `terraform.workspace`, na demo [01.5 - Workspaces](../01-Terraform/demos/05-Workspaces/README.md).
 
 > [!IMPORTANT]
 > Valide a sintaxe localmente antes de seguir, sem precisar de credenciais:
@@ -268,23 +262,16 @@ O state vive no S3 e existem dois ambientes (`dev` e `prod`) com recursos nomead
 
 <a id="req-3"></a>
 
-**Requisito 3.** Adicione **estado remoto no S3** no arquivo raiz que chama os módulos.
+**Requisito 3.** Configure o **estado remoto no S3** no arquivo raiz, usando:
 
-> 📚 **Revisar state remoto?** Veja a demo **[01.4 - State](../01-Terraform/demos/04-State/README.md)** (backend S3, `terraform init` migrando o state, lock).
+- **bucket**: o seu `base-config-<SEU-RM>` (o mesmo do setup, Módulo 01);
+- **key**: exatamente **`trabalho-final/terraform.tfstate`**;
+- **region**: `us-east-1`.
 
-```hcl
-# backend.tf (raiz)
-terraform {
-  backend "s3" {
-    bucket = "base-config-<SEU-RM>"
-    key    = "trabalho-final/terraform.tfstate"
-    region = "us-east-1"
-  }
-}
-```
+> 📚 O bloco `backend "s3"` (com `bucket`, `key`, `region`) e o `terraform init` migrando o state estão na demo **[01.4 - State](../01-Terraform/demos/04-State/README.md)** — use-a como referência para escrever o seu.
 
 > [!CAUTION]
-> Nomes de bucket S3 **não podem ter espaços** e são globais. Use o padrão `base-config-<SEU-RM>` (substitua `<SEU-RM>` pelo seu RM). **Não** versione `terraform.tfstate` no Git — adicione-o ao `.gitignore`.
+> Nomes de bucket S3 **não podem ter espaços** nem maiúsculas e são globais. **Não** versione `terraform.tfstate` no Git — adicione-o ao `.gitignore`.
 
 <details>
 <summary><b>⚠ Se der erro: <code>Error: Failed to get existing workspaces: S3 bucket does not exist</code></b></summary>
@@ -305,15 +292,9 @@ Depois rode `terraform init` novamente — ele migra o state para o S3.
 
 <a id="req-4"></a>
 
-**Requisito 4.** Faça com que os **nomes das máquinas** definidas dentro do módulo sigam o **workspace** atual. Exemplo: `nginx-prod-002`, `nginx-dev-001`.
+**Requisito 4.** Faça com que os **nomes das máquinas** (a tag `Name` das `aws_instance` do módulo) sigam o **workspace** atual, concatenando a variável **`${terraform.workspace}`** no nome. Exemplo do resultado: `nginx-prod-002`, `nginx-dev-001`.
 
-> 📚 **Revisar workspaces e `terraform.workspace`?** Veja a demo **[01.5 - Workspaces](../01-Terraform/demos/05-Workspaces/README.md)** (nomear recursos pelo workspace, states isolados).
-
-```hcl
-tags = {
-  Name = "nginx-${terraform.workspace}-${format("%03d", count.index + 1)}"
-}
-```
+> 📚 O padrão de concatenar `${terraform.workspace}` no nome do recurso está na demo **[01.5 - Workspaces](../01-Terraform/demos/05-Workspaces/README.md)** — veja lá como fica e replique na tag `Name` das instâncias (o `count.index` já vem da demo Count).
 
 ---
 
